@@ -17,6 +17,7 @@
 // Lesser General Public License for more details.
 //
 #include <inttypes.h>
+#include <Arduino.h>
 #include "Debug.h"
 
 #ifdef DEBUG

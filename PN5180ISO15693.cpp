@@ -38,7 +38,6 @@ ISO15693ErrorCode PN5180ISO15693::getInventory(uint8_t *uid) {
   uint8_t inventory[] = { 0x26, 0x01, 0x00 };
   //                        |\- inventory flag + high data rate
   //                        \-- 1 slot: only one card, no AFI field present
-  PN5180DEBUG(F("Get Inventory...\n"));
 
   for (int i=0; i<8; i++) {
     uid[i] = 0;  
@@ -188,9 +187,6 @@ ISO15693ErrorCode PN5180ISO15693::inventoryPoll(uint8_t *uid, uint8_t maxTags, u
   return ISO15693_EC_OK;
 }
 
-
-
-
 /*
  * Read single block, code=20
  *
@@ -227,19 +223,6 @@ ISO15693ErrorCode PN5180ISO15693::readSingleBlock(uint8_t *uid, uint8_t blockNo,
   for (int i=0; i<8; i++) {
     readSingleBlock[2+i] = uid[i];
   }
-
-#ifdef DEBUG
-  PN5180DEBUG("Read Single Block #");
-  PN5180DEBUG(blockNo);
-  PN5180DEBUG(", size=");
-  PN5180DEBUG(blockSize);
-  PN5180DEBUG(": ");
-  for (int i=0; i<sizeof(readSingleBlock); i++) {
-    PN5180DEBUG(" ");
-    PN5180DEBUG(formatHex(readSingleBlock[i]));
-  }
-  PN5180DEBUG("\n");
-#endif
 
   uint8_t *resultPtr;
   ISO15693ErrorCode rc = issueISO15693Command(readSingleBlock, sizeof(readSingleBlock), &resultPtr);
@@ -319,19 +302,6 @@ ISO15693ErrorCode PN5180ISO15693::writeSingleBlock(uint8_t *uid, uint8_t blockNo
     writeCmd[pos++] = blockData[i];
   }
 
-#ifdef DEBUG
-  PN5180DEBUG("Write Single Block #");
-  PN5180DEBUG(blockNo);
-  PN5180DEBUG(", size=");
-  PN5180DEBUG(blockSize);
-  PN5180DEBUG(":");
-  for (int i=0; i<writeCmdSize; i++) {
-    PN5180DEBUG(" ");
-    PN5180DEBUG(formatHex(writeCmd[i]));
-  }
-  PN5180DEBUG("\n");
-#endif
-
   uint8_t *resultPtr;
   ISO15693ErrorCode rc = issueISO15693Command(writeCmd, writeCmdSize, &resultPtr);
   if (ISO15693_EC_OK != rc) {
@@ -388,18 +358,6 @@ ISO15693ErrorCode PN5180ISO15693::readMultipleBlock(uint8_t *uid, uint8_t blockN
 
   for (int i=0; i<8; i++) {
     readMultipleCmd[2+i] = uid[i];
-  }
-
-  PN5180DEBUG("readMultipleBlock: Read Block #");
-  PN5180DEBUG(blockNo);
-  PN5180DEBUG("-");
-  PN5180DEBUG(blockNo+numBlock-1);
-  PN5180DEBUG(", blockSize=");
-  PN5180DEBUG(blockSize);
-  PN5180DEBUG(", Cmd: ");
-  for (int i=0; i<sizeof(readMultipleCmd); i++) {
-    PN5180DEBUG(" ");
-    PN5180DEBUG(formatHex(readMultipleCmd[i]));
   }
 
   uint8_t *resultPtr;
@@ -482,15 +440,6 @@ ISO15693ErrorCode PN5180ISO15693::getSystemInfo(uint8_t *uid, uint8_t *blockSize
   for (int i=0; i<8; i++) {
     sysInfo[2+i] = uid[i];
   }
-
-#ifdef DEBUG
-  PN5180DEBUG("Get System Information");
-  for (int i=0; i<sizeof(sysInfo); i++) {
-    PN5180DEBUG(" ");
-    PN5180DEBUG(formatHex(sysInfo[i]));
-  }
-  PN5180DEBUG("\n");
-#endif
 
   uint8_t *readBuffer;
   ISO15693ErrorCode rc = issueISO15693Command(sysInfo, sizeof(sysInfo), &readBuffer);
@@ -720,9 +669,56 @@ ISO15693ErrorCode PN5180ISO15693::enablePrivacyMode(uint8_t *password) {
  */
 ISO15693ErrorCode PN5180ISO15693::issueISO15693Command(uint8_t *cmd, uint8_t cmdLen, uint8_t **resultPtr) {
 #ifdef DEBUG
-  PN5180DEBUG(F("Issue Command 0x"));
-  PN5180DEBUG(formatHex(cmd[1]));
-  PN5180DEBUG("...\n");
+  PN5180DEBUG(F("Sending ISO15693 ["));
+  for (int b = 0; b < cmdLen; b++) {
+    if (b > 0) PN5180DEBUG(" ");
+    if (b == 0) {
+      PN5180DEBUG(F("("));
+      PN5180DEBUG((cmd[b] & 0x1) ? F("2Sub") : F("1Sub"));
+      PN5180DEBUG((cmd[b] & 0x2) ? F(" HiRate") : F(" LoRate"));
+      if (cmd[b] & 0x8) PN5180DEBUG(F(" Ext"));
+      if (cmd[b] & 0x4) {
+        PN5180DEBUG(F(" Inv"));
+        if (cmd[b] & 0x10) PN5180DEBUG(F(" AFI"));
+        PN5180DEBUG((cmd[b] & 0x20) ? F(" 1Slot") : F(" 16Slot"));
+        if (cmd[b] & 0x40) PN5180DEBUG(F(" Opt"));
+      } else {
+        if (cmd[b] & 0x10) PN5180DEBUG(F(" Sel"));
+        if (cmd[b] & 0x20) PN5180DEBUG(F(" Addr"));
+        if (cmd[b] & 0x40) PN5180DEBUG(F(" Opt"));
+      }
+      PN5180DEBUG(F(")"));
+    } else if (b == 1) {
+      switch (cmd[b]) {
+        case 0x01: PN5180DEBUG(F("INVENTORY")); break;
+        case 0x02: PN5180DEBUG(F("STAY-QUIET")); break;
+        case 0x20: PN5180DEBUG(F("READ-BLOCK")); break;
+        case 0x21: PN5180DEBUG(F("WRITE-BLOCK")); break;
+        case 0x22: PN5180DEBUG(F("LOCK-BLOCK")); break;
+        case 0x23: PN5180DEBUG(F("READ-BLOCKS")); break;
+        case 0x24: PN5180DEBUG(F("WRITE-BLOCKS")); break;
+        case 0x25: PN5180DEBUG(F("SELECT")); break;
+        case 0x26: PN5180DEBUG(F("RESET-TO-READY")); break;
+        case 0x27: PN5180DEBUG(F("WRITE-AFI")); break;
+        case 0x28: PN5180DEBUG(F("LOCK-AFI")); break;
+        case 0x29: PN5180DEBUG(F("WRITE-DSFID")); break;
+        case 0x2A: PN5180DEBUG(F("LOCK-DSFID")); break;
+        case 0x2B: PN5180DEBUG(F("GET-SYS-INFO")); break;
+        // ICODE SLIX specific commands
+        case 0xA0: PN5180DEBUG(F("GET-SECURITY")); break;
+        case 0xB2: PN5180DEBUG(F("GET-RANDOM")); break;
+        case 0xB3: PN5180DEBUG(F("SET-PASSWORD")); break;
+        case 0xBA: PN5180DEBUG(F("ENABLE-PRIVACY")); break;
+        default:
+          PN5180DEBUG("");
+          PN5180DEBUG(formatHex(cmd[b]));
+          break;
+      }
+    } else {
+      PN5180DEBUG(formatHex(cmd[b]));
+    }
+  }
+  PN5180DEBUG("]\n");
 #endif
 
   sendData(cmd, cmdLen);
@@ -747,39 +743,22 @@ ISO15693ErrorCode PN5180ISO15693::issueISO15693Command(uint8_t *cmd, uint8_t cmd
   */
   unsigned long startedWaiting = millis();
   while (!(irqR & RX_IRQ_STAT)) {
-      irqR = getIRQStatus();
-      if (millis() - startedWaiting > commandTimeout) {
-          PN5180DEBUG("Didnt detect RX_IRQ_STAT after sendData");
-          return EC_NO_CARD;
-      }
+    irqR = getIRQStatus();
+    if (millis() - startedWaiting > commandTimeout) {
+      PN5180DEBUG("Didnt detect RX_IRQ_STAT after sendData");
+      return EC_NO_CARD;
+    }
   }
-  
+
   uint32_t rxStatus;
   readRegister(RX_STATUS, &rxStatus);
-  
-  PN5180DEBUG(F("RX-Status="));
-  PN5180DEBUG(formatHex(rxStatus));
+  uint16_t len = (uint16_t)(rxStatus & 0x1ff);
 
-  uint16_t len = (uint16_t)(rxStatus & 0x000001ff);
-  
-  PN5180DEBUG(", len=");
-  PN5180DEBUG(len);
-  PN5180DEBUG("\n");
-
- *resultPtr = readData(len);
+  *resultPtr = readData(len);
   if (0L == *resultPtr) {
     PN5180DEBUG(F("*** ERROR in readData!\n"));
     return ISO15693_EC_UNKNOWN_ERROR;
   }
-  
-#ifdef DEBUG
-  Serial.print("Read=");
-  for (int i=0; i<len; i++) {
-    Serial.print(formatHex((*resultPtr)[i]));
-    if (i<len-1) Serial.print(":");
-  }
-  Serial.println();
-#endif
 
   uint32_t irqStatus = getIRQStatus();
   if (0 == (RX_SOF_DET_IRQ_STAT & irqStatus)) { // no card detected
@@ -791,7 +770,7 @@ ISO15693ErrorCode PN5180ISO15693::issueISO15693Command(uint8_t *cmd, uint8_t cmd
   uint8_t responseFlags = (*resultPtr)[0];
   if (responseFlags & (1<<0)) { // error flag
     uint8_t errorCode = (*resultPtr)[1];
-    
+
     PN5180DEBUG("ERROR code=");
     PN5180DEBUG(formatHex(errorCode));
     PN5180DEBUG(" - ");
@@ -815,17 +794,8 @@ ISO15693ErrorCode PN5180ISO15693::issueISO15693Command(uint8_t *cmd, uint8_t cmd
 }
 
 bool PN5180ISO15693::setupRF() {
-  PN5180DEBUG(F("Loading RF-Configuration...\n"));
-  if (loadRFConfig(0x0d, 0x8d)) {  // ISO15693 parameters
-    PN5180DEBUG(F("done.\n"));
-  }
-  else return false;
-
-  PN5180DEBUG(F("Turning ON RF field...\n"));
-  if (setRF_on()) {
-    PN5180DEBUG(F("done.\n"));
-  }
-  else return false;
+  if (!loadRFConfig(0x0d, 0x8d)) return false;  // ISO15693 parameters
+  if (!setRF_on()) return false;
 
   writeRegisterWithAndMask(SYSTEM_CONFIG, 0xfffffff8);  // Idle/StopCom Command
   writeRegisterWithOrMask(SYSTEM_CONFIG, 0x00000003);   // Transceive Command
@@ -833,12 +803,12 @@ bool PN5180ISO15693::setupRF() {
   return true;
 }
 
-const __FlashStringHelper *PN5180ISO15693::strerror(ISO15693ErrorCode errno) {
+const __FlashStringHelper *PN5180ISO15693::strerror(ISO15693ErrorCode err) {
   PN5180DEBUG(F("ISO15693ErrorCode="));
-  PN5180DEBUG(errno);
+  PN5180DEBUG(err);
   PN5180DEBUG("\n");
   
-  switch (errno) {
+  switch (err) {
     case EC_NO_CARD: return F("No card detected!");
     case ISO15693_EC_OK: return F("OK!");
     case ISO15693_EC_NOT_SUPPORTED: return F("Command is not supported!");
@@ -851,7 +821,7 @@ const __FlashStringHelper *PN5180ISO15693::strerror(ISO15693ErrorCode errno) {
     case ISO15693_EC_BLOCK_NOT_PROGRAMMED: return F("Specified block was not successfully programmed!");
     case ISO15693_EC_BLOCK_NOT_LOCKED: return F("Specified block was not successfully locked!");
     default:
-      if ((errno >= 0xA0) && (errno <= 0xDF)) {
+      if ((err >= 0xA0) && (err <= 0xDF)) {
         return F("Custom command error code!");
       }
       else return F("Undefined error code in ISO15693!");
