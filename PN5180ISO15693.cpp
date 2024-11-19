@@ -233,7 +233,7 @@ ISO15693ErrorCode PN5180ISO15693::readSingleBlock(uint8_t *uid, uint8_t blockNo,
   PN5180DEBUG("Value=");
   
   for (int i=0; i<blockSize; i++) {
-    blockData[i] = resultPtr[2+i];
+    blockData[i] = resultPtr[1+i];
 #ifdef DEBUG    
     PN5180DEBUG(formatHex(blockData[i]));
     PN5180DEBUG(" ");
